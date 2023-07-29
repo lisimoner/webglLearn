@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>WebGL Demo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix.js"></script>
+    <!-- 引入 mat4.js 库 -->
+    <style>
+      canvas {
+        display: block;
+        width: 40%;
+        height: 40%;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+
+  <body>
+    <button id="jiakuai">旋转加快</button>
+    <button id="jianman">旋转减慢</button>
+    <button id="shijiao1">俯视</button>
+    <button id="shijiao2">仰视</button>
+
+    <canvas id="canvas" width="1000" height="1000"></canvas>
+    <script>
+      const vertexShaderSource = `
+        attribute vec4 aVertexPosition;
+        attribute vec4 aVertexColor;
+
+        uniform mat4 uModelViewMatrix;
+        uniform mat4 uProjectionMatrix;
+        uniform mat4 uViewMatrix;
+
+        varying lowp vec4 vColor;
+
+        void main() {
+          gl_Position = uProjectionMatrix * uViewMatrix * uModelViewMatrix * aVertexPosition;
+          vColor = aVertexColor;
+        }
+      `;
+
+      const fragmentShaderSource = `
+        varying lowp vec4 vColor;
+
+        void main() {
+          gl_FragColor = vColor;
+        }
+      `;
+
+      const canvas = document.getElementById("canvas");
+      const gl = canvas.getContext("webgl");
+
+      if (!gl) {
+        alert("Unable to initialize WebGL. Your browser may not support it.");
+      }
+
+      const colors = [
+        // Bottom triangle (red)
+        1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0,
+        // Left triangle (green)
+        0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
+        // Right triangle (blue)
+        0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0,
+        // Back triangle (yellow)
+        1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+      ];
+
+      const vertices = [
+        // ABC
+        0.0, 0.0, 5.77, -5, 0.0, -2.88, 5, 0, -2.88,
+        // DAC
+        0.0, 5.27, 0.0, -5, 0.0, -2.88, 0.0, 0.0, 5.77,
+        // DAB
+        0.0, 5.27, 0.0, -5, 0.0, -2.88, 5, 0, -2.88,
+        // DBC
+        0.0, 5.27, 0.0, 5, 0, -2.88, 0.0, 0.0, 5.77,
+      ];
+
+      const indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+      // 对于顶点着色器，调用gl.createShader()函数并传入gl.VERTEX_SHADER作为参数。
+      const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+      // 将源代码发送到着色器
+      gl.shaderSource(vertexShader, vertexShaderSource);
+      // 一旦着色器获取到源代码，就使用gl.compileShader().进行编译
+      gl.compileShader(vertexShader);
+
+      // 对于片元着色器，调用相同的函数并传入gl.FRAGMENT_SHADER。
+      const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+      //   将源代码发送到着色器
+      gl.shaderSource(fragmentShader, fragmentShaderSource);
+      // 一旦着色器获取到源代码，就使用gl.compileShader().进行编译
+      gl.compileShader(fragmentShader);
+
+      //   创建着色器程序
+      const program = gl.createProgram();
+
+      // 将顶点着色器和片元着色器附加到程序上
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      // 链接程序
+      gl.linkProgram(program);
+
+      // 深度检测
+      gl.enable(gl.DEPTH_TEST);
+      gl.clear(gl.DEPTH_BUFFER_BIT);
+
+      //   获取顶点属性位置并启用 attribute 组件
+      const positionAttributeLocation = gl.getAttribLocation(
+        program,
+        "aVertexPosition"
+      );
+      const colorAttributeLocation = gl.getAttribLocation(
+        program,
+        "aVertexColor"
+      );
+      const modelViewMatrixUniformLocation = gl.getUniformLocation(
+        program,
+        "uModelViewMatrix"
+      );
+      const projectionMatrixUniformLocation = gl.getUniformLocation(
+        program,
+        "uProjectionMatrix"
+      );
+
+      const viewMatrixLocation = gl.getUniformLocation(program, "uViewMatrix");
+
+      //创建缓冲区对象
+      const positionBuffer = gl.createBuffer();
+      //绑定缓冲区对象
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      //顶点数组data数据传入缓冲区
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(vertices),
+        gl.STATIC_DRAW
+      );
+
+      // 创建颜色缓冲区
+      const colorBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+      // 创建顶点顺序缓冲区
+      const indexBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+      gl.bufferData(
+        gl.ELEMENT_ARRAY_BUFFER,
+        new Uint16Array(indices),
+        gl.STATIC_DRAW
+      );
+
+      // 使用着色器程序进行渲染
+      gl.useProgram(program);
+
+      //允许数据传递
+      gl.enableVertexAttribArray(positionAttributeLocation);
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.vertexAttribPointer(
+        positionAttributeLocation,
+        3,
+        gl.FLOAT,
+        false,
+        0,
+        0
+      );
+
+      gl.enableVertexAttribArray(colorAttributeLocation);
+      gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+      gl.vertexAttribPointer(colorAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+
+      const fieldOfView = (45 * Math.PI) / 180;
+      const aspect = canvas.clientWidth / canvas.clientHeight;
+      const zNear = 0.1;
+      const zFar = 100.0;
+      const projectionMatrix = mat4.create();
+      // 创建一个透视投影矩阵。
+      mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
+
+      const modelViewMatrix = mat4.create();
+      mat4.translate(modelViewMatrix, modelViewMatrix, [-0.0, 0.0, -4.0]);
+
+      let cameraPosition = vec3.fromValues(0, -6, 15); // 相机位置
+      let cameraTarget = vec3.fromValues(0, 0, 0); // 相机目标位置
+      let upVector = vec3.fromValues(0, 2, 0);
+      let viewMatrix = mat4.create();
+      mat4.lookAt(viewMatrix, cameraPosition, cameraTarget, upVector);
+
+      let angle = 0.01;
+      // mat4.rotate(modelViewMatrix, modelViewMatrix, -0.1, [1, 0, 0]);
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        mat4.rotateY(modelViewMatrix, modelViewMatrix, angle); // 添加旋转矩阵
+        gl.uniformMatrix4fv(
+          modelViewMatrixUniformLocation,
+          false,
+          modelViewMatrix
+        );
+        // 设置着色器属性
+        gl.uniformMatrix4fv(
+          projectionMatrixUniformLocation,
+          false,
+          projectionMatrix
+        );
+        gl.uniformMatrix4fv(viewMatrixLocation, false, viewMatrix);
+
+        gl.drawElements(gl.TRIANGLES, 12, gl.UNSIGNED_SHORT, 0);
+      }
+      const myDiv1 = document.querySelector("#jiakuai");
+      const myDiv2 = document.querySelector("#jianman");
+      const myDiv3 = document.querySelector("#shijiao1");
+      const myDiv4 = document.querySelector("#shijiao2");
+      myDiv1.addEventListener("click", () => {
+        // 点击事件的处理逻辑
+        angle = angle + 0.01;
+      });
+      myDiv2.addEventListener("click", () => {
+        // 点击事件的处理逻辑
+        if (angle < 0) return;
+        angle = angle - 0.01;
+      });
+      myDiv3.addEventListener("click", () => {
+        cameraPosition = vec3.fromValues(0, 6, 15); // 相机位置
+        mat4.lookAt(viewMatrix, cameraPosition, cameraTarget, upVector);
+      });
+      myDiv3.addEventListener("click", () => {
+        cameraPosition = vec3.fromValues(0, 6, 15); // 相机位置
+        mat4.lookAt(viewMatrix, cameraPosition, cameraTarget, upVector);
+      });
+
+      myDiv4.addEventListener("click", () => {
+        cameraPosition = vec3.fromValues(0, -6, 15); // 相机位置
+        mat4.lookAt(viewMatrix, cameraPosition, cameraTarget, upVector);
+      });
+      animate();
+    </script>
+  </body>
+</html>

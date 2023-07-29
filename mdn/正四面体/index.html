@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>WebGL Demo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix.js"></script>
+    <!-- 引入 mat4.js 库 -->
+    <style>
+      canvas {
+        display: block;
+        width: 40%;
+        height: 40%;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" width="1000" height="1000"></canvas>
+    <script>
+      const vertexShaderSource = `
+        attribute vec4 aVertexPosition;
+        attribute vec4 aVertexColor;
+
+        uniform mat4 uModelViewMatrix;
+        uniform mat4 uProjectionMatrix;
+
+        varying lowp vec4 vColor;
+
+        void main() {
+          gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+          vColor = aVertexColor;
+        }
+      `;
+
+      const fragmentShaderSource = `
+        varying lowp vec4 vColor;
+
+        void main() {
+          gl_FragColor = vColor;
+        }
+      `;
+
+      const canvas = document.getElementById("canvas");
+      const gl = canvas.getContext("webgl");
+
+      if (!gl) {
+        alert("Unable to initialize WebGL. Your browser may not support it.");
+      }
+
+      const colors = [
+        // Bottom triangle (red)
+        1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0,
+        // Left triangle (green)
+        0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
+        // Right triangle (blue)
+        0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0,
+        // Back triangle (yellow)
+        1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+      ];
+
+      // const vertices1 = [
+      //   0.0, 0.0, 0.0,
+      //   1.0, 0.0, 0.0,
+      //   0.707, 0, 0.707,
+
+      //   0.5, 0.507, 0.307,
+      //   1.0, 0.0, 0.0,
+      //   0.707, 0, 0.707,
+
+      //   0.5, 0.507, 0.307,
+      //   0.0, 0.0, 0.0,
+      //   1.0, 0.0, 0.0,
+
+      //   0.5, 0.507, 0.307,
+      //   0.707, 0, 0.707,
+      //   0.0, 0.0, 0.0,
+
+      // ];
+      const vertices = [
+        // ABC
+        0.0, 0.0, 0.577,
+        -0.5, 0.0, -0.288,
+        0.5, 0, -0.288,
+        // DAC
+        0.0, 0.527, 0.0,
+        -0.5, 0.0, -0.288,
+        0.0, 0.0, 0.577,
+        // DAB
+        0.0, 0.527, 0.0,
+        -0.5, 0.0, -0.288,
+        0.5, 0, -0.288,
+        // DBC
+        0.0, 0.527, 0.0,
+        0.5, 0, -0.288,
+        0.0, 0.0, 0.577,
+      ];
+
+      const indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      // 对于顶点着色器，调用gl.createShader()函数并传入gl.VERTEX_SHADER作为参数。
+      const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+
+      // 将源代码发送到着色器
+      gl.shaderSource(vertexShader, vertexShaderSource);
+
+      // 一旦着色器获取到源代码，就使用gl.compileShader().进行编译
+      gl.compileShader(vertexShader);
+      // 对于片元着色器，调用相同的函数并传入gl.FRAGMENT_SHADER。
+      const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+      //   将源代码发送到着色器
+      gl.shaderSource(fragmentShader, fragmentShaderSource);
+      // 一旦着色器获取到源代码，就使用gl.compileShader().进行编译
+      gl.compileShader(fragmentShader);
+      //   创建着色器程序
+      const program = gl.createProgram();
+      // 将顶点着色器和片元着色器附加到程序上
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      // 链接程序
+      gl.linkProgram(program);
+      gl.enable(gl.DEPTH_TEST);
+      gl.clear(gl.DEPTH_BUFFER_BIT);
+      //   获取顶点属性位置并启用 attribute 组件
+      const positionAttributeLocation = gl.getAttribLocation(
+        program,
+        "aVertexPosition"
+      );
+      const colorAttributeLocation = gl.getAttribLocation(
+        program,
+        "aVertexColor"
+      );
+      const modelViewMatrixUniformLocation = gl.getUniformLocation(
+        program,
+        "uModelViewMatrix"
+      );
+      const projectionMatrixUniformLocation = gl.getUniformLocation(
+        program,
+        "uProjectionMatrix"
+      );
+
+      const positionBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(vertices),
+        gl.STATIC_DRAW
+      );
+      const colorBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+      const indexBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+      gl.bufferData(
+        gl.ELEMENT_ARRAY_BUFFER,
+        new Uint16Array(indices),
+        gl.STATIC_DRAW
+      );
+
+      gl.useProgram(program);
+
+      gl.enableVertexAttribArray(positionAttributeLocation);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+      const size = 3;
+      const type = gl.FLOAT;
+      const normalize = false;
+      const stride = 0;
+      const offset = 0;
+      gl.vertexAttribPointer(
+        positionAttributeLocation,
+        size,
+        type,
+        normalize,
+        stride,
+        offset
+      );
+
+      gl.enableVertexAttribArray(colorAttributeLocation);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+
+      const size2 = 4;
+      const type2 = gl.FLOAT;
+      const normalize2 = false;
+      const stride2 = 0;
+      const offset2 = 0;
+      gl.vertexAttribPointer(
+        colorAttributeLocation,
+        size2,
+        type2,
+        normalize2,
+        stride2,
+        offset2
+      );
+
+      const fieldOfView = (15 * Math.PI) / 180;
+      const aspect = canvas.clientWidth / canvas.clientHeight;
+      const zNear = 1;
+      const zFar = 100.0;
+      const projectionMatrix = mat4.create();
+      mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
+
+      const modelViewMatrix = mat4.create();
+
+      mat4.translate(modelViewMatrix, modelViewMatrix, [0.0, 0.0, -6.0, 180]);
+      mat4.rotate(modelViewMatrix, modelViewMatrix, -1.1, [1, 1, 0]);
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        mat4.rotate(modelViewMatrix, modelViewMatrix, 0.01, [0, 1, 0]);
+
+        gl.uniformMatrix4fv(
+          modelViewMatrixUniformLocation,
+          false,
+          modelViewMatrix
+        );
+        gl.uniformMatrix4fv(
+          projectionMatrixUniformLocation,
+          false,
+          projectionMatrix
+        );
+
+        const primitiveType = gl.TRIANGLES;
+        const elementType = gl.UNSIGNED_SHORT;
+        const offset3 = 0;
+        const count = 12;
+        gl.drawElements(primitiveType, count, elementType, offset3);
+      }
+      animate();
+    </script>
+  </body>
+</html>
